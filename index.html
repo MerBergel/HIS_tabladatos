@@ -3,138 +3,339 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Visualizador micro:bit</title>
+
+<title>Huerto Inteligente · Visualizador CSV</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: linear-gradient(135deg, #0f172a, #1e293b);
-        color: white;
-        margin: 0;
-        padding: 20px;
-    }
 
-    h1 {
-        text-align: center;
-        margin-bottom: 20px;
-    }
+body{
+    margin:0;
+    padding:20px;
+    font-family:Arial, sans-serif;
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    color:white;
+}
 
-    .upload-box {
-        background: rgba(255,255,255,0.1);
-        border: 2px dashed #38bdf8;
-        padding: 30px;
-        text-align: center;
-        border-radius: 20px;
-        margin-bottom: 20px;
-    }
+h1{
+    text-align:center;
+    margin-bottom:20px;
+}
 
-    input[type=file] {
-        margin-top: 15px;
-    }
+.upload{
+    background:rgba(255,255,255,0.1);
+    padding:25px;
+    border-radius:20px;
+    border:2px dashed #38bdf8;
+    text-align:center;
+    margin-bottom:30px;
+}
 
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-        color: black;
-        border-radius: 10px;
-        overflow: hidden;
-    }
+.card{
+    background:white;
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:30px;
+}
 
-    th {
-        background: #0ea5e9;
-        color: white;
-        padding: 12px;
-    }
+canvas{
+    width:100% !important;
+    max-height:400px;
+}
 
-    td {
-        padding: 10px;
-        text-align: center;
-        border-bottom: 1px solid #ddd;
-    }
+.table-container{
+    overflow-x:auto;
+}
 
-    tr:nth-child(even) {
-        background: #f1f5f9;
-    }
+table{
+    width:100%;
+    border-collapse:collapse;
+    color:black;
+}
 
-    .info {
-        margin-top: 20px;
-        background: rgba(255,255,255,0.1);
-        padding: 15px;
-        border-radius: 10px;
-    }
+th{
+    background:#0ea5e9;
+    color:white;
+    padding:12px;
+}
+
+td{
+    padding:10px;
+    text-align:center;
+    border-bottom:1px solid #ddd;
+}
+
+tr:nth-child(even){
+    background:#f1f5f9;
+}
+
+.info{
+    background:rgba(255,255,255,0.1);
+    padding:15px;
+    border-radius:15px;
+    margin-bottom:20px;
+}
+
 </style>
 </head>
+
 <body>
 
-<h1>🌱 Visualizador de Datos micro:bit</h1>
+<h1>🌱 Huerto Inteligente · Visualizador CSV</h1>
 
-<div class="upload-box">
-    <h2>Sube tu archivo .HTM de micro:bit</h2>
-    <input type="file" id="fileInput">
+<div class="upload">
+
+    <h2>Sube el CSV de la micro:bit</h2>
+
+    <input type="file" id="csvFile" accept=".csv">
+
 </div>
 
-<div id="tableContainer"></div>
+<div class="info" id="stats">
+
+    Esperando archivo...
+
+</div>
+
+<div class="card">
+    <canvas id="tempChart"></canvas>
+</div>
+
+<div class="card">
+    <canvas id="humChart"></canvas>
+</div>
+
+<div class="card">
+    <canvas id="lightChart"></canvas>
+</div>
+
+<div class="card table-container">
+
+    <table id="dataTable"></table>
+
+</div>
 
 <script>
 
-document.getElementById('fileInput').addEventListener('change', function(event) {
+let tempChart = null;
+let humChart = null;
+let lightChart = null;
+
+document.getElementById('csvFile').addEventListener('change', function(event){
 
     const file = event.target.files[0];
 
-    if (!file) return;
+    if(!file) return;
 
     const reader = new FileReader();
 
-    // Leer archivo en ANSI/Latin1 para evitar símbolos raros de micro:bit
+    reader.onload = function(e){
 
-    reader.onload = function(e) {
+        const text = e.target.result;
 
-        const content = e.target.result;
+        const lines = text.trim().split('\n');
 
-        // Buscar datos CSV dentro del archivo
-        const match = content.match(/Time \(seconds\),temperature,light,soilHumidity[\s\S]*?(?=ÿÿÿÿ|<\/body>|$)/);
+        const headers = lines[0].split(',');
 
-        if (!match) {
-            alert('No se encontraron datos válidos');
-            return;
+        const data = [];
+
+        for(let i=1;i<lines.length;i++){
+
+            const row = lines[i].split(',');
+
+            if(row.length >= headers.length){
+                data.push(row);
+            }
         }
 
-        const csvText = match[0].trim();
+        createTable(headers,data);
 
-        const lines = csvText.split('
-')
-            .map(line => line.replace(/ÿ/g, '').trim())
-            .filter(line => line.includes(','))
-            .filter(line => !line.includes('time'))
-            .filter(line => !line.includes('00000000'));
+        createCharts(data);
 
-        let html = '<table>';
+        createStats(data);
+    }
 
-        lines.forEach((line, index) => {
+    reader.readAsText(file);
 
-            const cols = line.split(',').map(c => c.trim());
+});
 
-            html += '<tr>';
+function createTable(headers,data){
 
-            cols.forEach(col => {
-                if(index === 0){
-                    html += `<th>${col}</th>`;
-                } else {
-                    html += `<td>${col}</td>`;
-                }
-            });
+    let html = '<tr>';
 
-            html += '</tr>';
+    headers.forEach(h=>{
+        html += `<th>${h}</th>`;
+    });
+
+    html += '</tr>';
+
+    data.forEach(row=>{
+
+        html += '<tr>';
+
+        row.forEach(col=>{
+            html += `<td>${col}</td>`;
         });
 
-        html += '</table>';
+        html += '</tr>';
+    });
 
-        document.getElementById('tableContainer').innerHTML = html;
-    };
+    document.getElementById('dataTable').innerHTML = html;
+}
 
-    reader.readAsText(file, 'latin1');
-});
+function createCharts(data){
+
+    const hora = [];
+    const temperatura = [];
+    const luz = [];
+    const humedad = [];
+
+    data.forEach(row=>{
+
+        hora.push(row[1]);
+
+        temperatura.push(Number(row[2]));
+
+        luz.push(Number(row[3]));
+
+        humedad.push(Number(row[4]));
+    });
+
+    // ELIMINAR GRÁFICAS ANTERIORES
+
+    if(tempChart) tempChart.destroy();
+    if(humChart) humChart.destroy();
+    if(lightChart) lightChart.destroy();
+
+    // ======================
+    // TEMPERATURA
+    // ======================
+
+    tempChart = new Chart(
+    document.getElementById('tempChart'),
+    {
+        type:'line',
+
+        data:{
+            labels:hora,
+
+            datasets:[{
+                label:'Temperatura °C',
+                data:temperatura,
+                borderWidth:3,
+                tension:0.3
+            }]
+        },
+
+        options:{
+            responsive:true,
+
+            plugins:{
+                title:{
+                    display:true,
+                    text:'🌡️ Temperatura'
+                }
+            }
+        }
+    });
+
+    // ======================
+    // HUMEDAD
+    // ======================
+
+    humChart = new Chart(
+    document.getElementById('humChart'),
+    {
+        type:'line',
+
+        data:{
+            labels:hora,
+
+            datasets:[{
+                label:'Humedad del Suelo',
+                data:humedad,
+                borderWidth:3,
+                tension:0.3
+            }]
+        },
+
+        options:{
+            responsive:true,
+
+            plugins:{
+                title:{
+                    display:true,
+                    text:'💧 Humedad del Suelo'
+                }
+            }
+        }
+    });
+
+    // ======================
+    // LUZ
+    // ======================
+
+    lightChart = new Chart(
+    document.getElementById('lightChart'),
+    {
+        type:'line',
+
+        data:{
+            labels:hora,
+
+            datasets:[{
+                label:'Luz',
+                data:luz,
+                borderWidth:3,
+                tension:0.3
+            }]
+        },
+
+        options:{
+            responsive:true,
+
+            plugins:{
+                title:{
+                    display:true,
+                    text:'☀️ Luz'
+                }
+            }
+        }
+    });
+}
+
+function createStats(data){
+
+    const temperaturas = data.map(r=>Number(r[2]));
+    const humedad = data.map(r=>Number(r[4]));
+
+    const mediaTemp =
+    (
+        temperaturas.reduce((a,b)=>a+b,0)
+        /
+        temperaturas.length
+    ).toFixed(1);
+
+    const mediaHum =
+    (
+        humedad.reduce((a,b)=>a+b,0)
+        /
+        humedad.length
+    ).toFixed(1);
+
+    document.getElementById('stats').innerHTML = `
+
+        <h2>📊 Resumen del Huerto</h2>
+
+        <p>🌡️ Temperatura media: <b>${mediaTemp} °C</b></p>
+
+        <p>💧 Humedad media del suelo: <b>${mediaHum}</b></p>
+
+        <p>📁 Registros cargados: <b>${data.length}</b></p>
+
+    `;
+}
 
 </script>
 
