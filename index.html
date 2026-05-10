@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador micro:bit</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: white;
+        margin: 0;
+        padding: 20px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .upload-box {
+        background: rgba(255,255,255,0.1);
+        border: 2px dashed #38bdf8;
+        padding: 30px;
+        text-align: center;
+        border-radius: 20px;
+        margin-bottom: 20px;
+    }
+
+    input[type=file] {
+        margin-top: 15px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        color: black;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    th {
+        background: #0ea5e9;
+        color: white;
+        padding: 12px;
+    }
+
+    td {
+        padding: 10px;
+        text-align: center;
+        border-bottom: 1px solid #ddd;
+    }
+
+    tr:nth-child(even) {
+        background: #f1f5f9;
+    }
+
+    .info {
+        margin-top: 20px;
+        background: rgba(255,255,255,0.1);
+        padding: 15px;
+        border-radius: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h1>🌱 Visualizador de Datos micro:bit</h1>
+
+<div class="upload-box">
+    <h2>Sube tu archivo .HTM de micro:bit</h2>
+    <input type="file" id="fileInput">
+</div>
+
+<div id="tableContainer"></div>
+
+<script>
+
+document.getElementById('fileInput').addEventListener('change', function(event) {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+
+        const content = e.target.result;
+
+        // Buscar datos CSV dentro del archivo
+        const match = content.match(/Time \(seconds\),temperature,light,soilHumidity[\s\S]*?(?=ÿÿÿÿ|<\/body>|$)/);
+
+        if (!match) {
+            alert('No se encontraron datos válidos');
+            return;
+        }
+
+        const csvText = match[0].trim();
+
+        const lines = csvText.split('\n')
+            .filter(line => line.includes(','))
+            .filter(line => !line.includes('time'));
+
+        let html = '<table>';
+
+        lines.forEach((line, index) => {
+
+            const cols = line.split(',');
+
+            html += '<tr>';
+
+            cols.forEach(col => {
+                if(index === 0){
+                    html += `<th>${col}</th>`;
+                } else {
+                    html += `<td>${col}</td>`;
+                }
+            });
+
+            html += '</tr>';
+        });
+
+        html += '</table>';
+
+        document.getElementById('tableContainer').innerHTML = html;
+    };
+
+    reader.readAsText(file);
+});
+
+</script>
+
+</body>
+</html>
